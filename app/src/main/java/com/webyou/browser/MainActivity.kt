@@ -2,6 +2,7 @@ package com.webyou.browser
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
@@ -63,8 +64,13 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -83,6 +89,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import androidx.webkit.ProxyConfig
 import androidx.webkit.ProxyController
@@ -147,6 +154,7 @@ class WebYouState {
 @Composable
 fun WebYouRoot() {
     val state = remember { WebYouState() }
+    val context = LocalContext.current
     val isDark = when (state.theme) {
         AppTheme.DARK, AppTheme.AMOLED -> true
         AppTheme.LIGHT -> false
@@ -155,11 +163,20 @@ fun WebYouRoot() {
     val lightPrimary = listOf(Color(0xFF7656D6), Color(0xFF3F63D8), Color(0xFFAF4D7B), Color(0xFF4B8C7A))
     val darkPrimary = listOf(Color(0xFFB8A6FF), Color(0xFFA9B9FF), Color(0xFFFFA8D2), Color(0xFF9FE0CA))
     val primary = if (isDark) darkPrimary[state.accent] else lightPrimary[state.accent]
-    val background = if (state.theme == AppTheme.AMOLED) Color.Black else MaterialTheme.colorScheme.background
 
-    MaterialTheme(
-        colorScheme = if (isDark) androidx.compose.material3.darkColorScheme(primary = primary, background = background) else androidx.compose.material3.lightColorScheme(primary = primary, background = background)
-    ) {
+    val baseScheme = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && isDark -> dynamicDarkColorScheme(context)
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> dynamicLightColorScheme(context)
+        isDark -> darkColorScheme(primary = primary)
+        else -> lightColorScheme(primary = primary)
+    }
+    val colorScheme = baseScheme.copy(
+        primary = primary,
+        background = if (state.theme == AppTheme.AMOLED) Color.Black else baseScheme.background,
+        surface = if (state.theme == AppTheme.AMOLED) Color.Black else baseScheme.surface
+    )
+
+    MaterialTheme(colorScheme = colorScheme) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
@@ -189,7 +206,7 @@ fun WebYouRoot() {
                         }
                     }
                 }
-            }
+            )
         }
     }
 }
@@ -212,62 +229,132 @@ private fun ExpressiveBackground(
     dark: Boolean
 ) {
     Canvas(modifier.fillMaxSize()) {
-        drawRect(if (dark) Color(0xFF161717) else Color(0xFFF9F7FF))
-        val blob = if (dark) Color(0xFF312842) else Color(0xFFECE5FF)
-        val wave = size.height * depth
-        repeat(count.coerceIn(3, 12)) { i ->
-            val y = size.height * 0.08f + wave * i / count.coerceAtLeast(1)
-            val path = Path().apply {
-                moveTo(0f, y)
-                cubicTo(size.width * 0.22f, y - wave * 0.55f, size.width * 0.42f, y + wave * 0.55f, size.width * 0.66f, y)
-                cubicTo(size.width * 0.82f, y - wave * 0.35f, size.width * 0.93f, y + wave * 0.35f, size.width, y - wave * 0.08f)
-                lineTo(size.width, size.height)
-                lineTo(0f, size.height)
-                close()
-            }
-            drawPath(path, blob.copy(alpha = 0.10f + i * 0.008f))
+        drawRect(if (dark) Color(0xFF0F0F12) else Color(0xFFFAF8FF))
+        val blob = if (dark) Color(0xFF3A2D52) else Color(0xFFE7DFFF)
+        val width = size.width
+        val height = size.height
+        val path = Path().apply {
+            moveTo(-width * 0.12f, height * 0.20f)
+            cubicTo(width * 0.16f, height * 0.05f, width * 0.42f, height * 0.32f, width * 0.72f, height * 0.16f)
+            cubicTo(width * 0.88f, height * 0.08f, width * 1.06f, height * 0.12f, width * 1.10f, height * 0.24f)
+            lineTo(width * 1.10f, height * 0.46f)
+            cubicTo(width * 0.78f, height * 0.36f, width * 0.42f, height * 0.48f, -width * 0.12f, height * 0.34f)
+            close()
         }
+        drawPath(path, blob.copy(alpha = if (dark) 0.18f else 0.34f))
+
+        val lower = Path().apply {
+            moveTo(-width * 0.10f, height * 0.78f)
+            cubicTo(width * 0.18f, height * 0.64f, width * 0.52f, height * 0.88f, width * 0.84f, height * 0.72f)
+            cubicTo(width * 0.98f, height * 0.65f, width * 1.08f, height * 0.68f, width * 1.10f, height * 0.76f)
+            lineTo(width * 1.10f, height * 0.98f)
+            lineTo(-width * 0.10f, height * 0.98f)
+            close()
+        }
+        drawPath(lower, blob.copy(alpha = if (dark) 0.10f else 0.16f))
     }
 }
 
 @Composable
 private fun HomeScreen(s: WebYouState) {
     var query by remember { mutableStateOf("") }
-    val tab = s.activeTab()
-    Column(Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Spacer(Modifier.height(18.dp))
-        Text("WebYou", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-        Text("быстрый, приватный браузер", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(
+        Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(42.dp))
+        WebYouMark()
+        Spacer(Modifier.height(12.dp))
+        Text("WebYou", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+        Text("твой браузер, по-твоему", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(28.dp))
+
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(32.dp),
             leadingIcon = { Icon(Icons.Rounded.Search, null) },
-            trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { openQuery(s, query) }) { Icon(Icons.Rounded.OpenInNew, null) } },
-            placeholder = { Text("поиск или адрес") }
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { openQuery(s, query) }) {
+                        Icon(Icons.Rounded.OpenInNew, contentDescription = "Открыть")
+                    }
+                }
+            },
+            placeholder = { Text("поиск или адрес") },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent
+            )
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            HomeAction("Вкладки", Icons.Rounded.MoreVert, Modifier.weight(1f)) { s.screen = "tabs" }
-            HomeAction("Настройки", Icons.Rounded.Tune, Modifier.weight(1f)) { s.screen = "settings" }
+
+        Spacer(Modifier.height(26.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            HomeShortcut("Google", Icons.Rounded.Search, Modifier.weight(1f)) { openQuery(s, "https://www.google.com") }
+            HomeShortcut("YouTube", Icons.Rounded.Language, Modifier.weight(1f)) { openQuery(s, "https://www.youtube.com") }
+            HomeShortcut("Wikipedia", Icons.Rounded.Language, Modifier.weight(1f)) { openQuery(s, "https://www.wikipedia.org") }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            HomeAction("Приватность", Icons.Rounded.PrivacyTip, Modifier.weight(1f)) { s.screen = "privacy" }
-            HomeAction("Перевод", Icons.Rounded.Translate, Modifier.weight(1f)) { s.screen = "translate" }
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            HomeShortcut("GitHub", Icons.Rounded.Code, Modifier.weight(1f)) { openQuery(s, "https://github.com") }
+            HomeShortcut("Reddit", Icons.Rounded.Forum, Modifier.weight(1f)) { openQuery(s, "https://www.reddit.com") }
+            HomeShortcut("DuckDuckGo", Icons.Rounded.Public, Modifier.weight(1f)) { openQuery(s, "https://duckduckgo.com") }
         }
-        if (s.proxyEnabled) AssistChip(onClick = { s.screen = "proxy" }, label = { Text("Прокси включён") }, leadingIcon = { Icon(Icons.Rounded.Wifi, null) })
         Spacer(Modifier.weight(1f))
-        Text("текущая вкладка: ${tab.title}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        if (s.proxyEnabled) {
+            AssistChip(onClick = { s.screen = "proxy" }, label = { Text("Прокси включён") }, leadingIcon = { Icon(Icons.Rounded.Wifi, null) })
+            Spacer(Modifier.height(10.dp))
+        }
+        Text("${s.tabs.size} ${if (s.tabs.size == 1) "вкладка" else "вкладки"}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        Spacer(Modifier.height(12.dp))
     }
 }
 
 @Composable
-private fun HomeAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: () -> Unit) {
-    Card(modifier.clickable(onClick = onClick), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f))) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun WebYouMark() {
+    Canvas(Modifier.width(64.dp).height(64.dp)) {
+        val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+        val r = size.minDimension * 0.39f
+        val leaf = androidx.compose.ui.geometry.Path().apply {
+            moveTo(center.x, center.y - r)
+            cubicTo(center.x + r * 0.62f, center.y - r * 1.05f, center.x + r * 1.02f, center.y - r * 0.62f, center.x + r * 0.78f, center.y)
+            cubicTo(center.x + r * 1.02f, center.y + r * 0.62f, center.x + r * 0.62f, center.y + r * 1.05f, center.x, center.y + r)
+            cubicTo(center.x - r * 0.62f, center.y + r * 1.05f, center.x - r * 1.02f, center.y + r * 0.62f, center.x - r * 0.78f, center.y)
+            cubicTo(center.x - r * 1.02f, center.y - r * 0.62f, center.x - r * 0.62f, center.y - r * 1.05f, center.x, center.y - r)
+            close()
+        }
+        drawPath(leaf, MaterialTheme.colorScheme.primaryContainer)
+        drawOval(MaterialTheme.colorScheme.primary, androidx.compose.ui.geometry.Rect(center.x - r * 0.72f, center.y - r * 0.34f, center.x + r * 0.72f, center.y + r * 0.34f))
+        drawOval(MaterialTheme.colorScheme.onPrimary, androidx.compose.ui.geometry.Rect(center.x - r * 0.43f, center.y - r * 0.16f, center.x + r * 0.43f, center.y + r * 0.16f))
+        val arrow = Path().apply {
+            moveTo(center.x - r * 0.20f, center.y + r * 0.10f)
+            cubicTo(center.x + r * 0.05f, center.y + r * 0.30f, center.x + r * 0.32f, center.y + r * 0.12f, center.x + r * 0.42f, center.y - r * 0.08f)
+            lineTo(center.x + r * 0.28f, center.y - r * 0.02f)
+            lineTo(center.x + r * 0.50f, center.y - r * 0.18f)
+            lineTo(center.x + r * 0.42f, center.y + r * 0.10f)
+            close()
+        }
+        drawPath(arrow, MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun HomeShortcut(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: () -> Unit) {
+    Surface(
+        modifier = modifier.height(78.dp).clickable(onClick = onClick),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.90f),
+        tonalElevation = 2.dp
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-            Text(label, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(6.dp))
+            Text(label, fontWeight = FontWeight.Medium, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
