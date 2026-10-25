@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -12,10 +13,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,21 +33,25 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PrivacyTip
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -58,6 +61,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -71,7 +75,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -83,18 +89,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import androidx.webkit.ProxyConfig
 import androidx.webkit.ProxyController
 import androidx.webkit.WebViewFeature
 import java.io.ByteArrayInputStream
+import java.net.URLEncoder
 import java.util.concurrent.Executors
 
 private const val HOME_URL = "https://www.google.com"
@@ -127,17 +135,20 @@ class WebYouState {
     var proxyEnabled by mutableStateOf(false)
     var proxyHost by mutableStateOf("")
     var blockedCount by mutableIntStateOf(0)
-    var accent by mutableStateOf(0)
+    var accent by mutableIntStateOf(0)
     var waveDepth by mutableStateOf(0.08f)
     var waveCount by mutableIntStateOf(8)
+    var menuOpen by mutableStateOf(false)
 
     fun activeTab(): BrowserTab = tabs.first { it.id == activeTabId }
+
     fun addTab(incognito: Boolean = false) {
         val id = (tabs.maxOfOrNull { it.id } ?: 0) + 1
         tabs.add(BrowserTab(id, incognito = incognito, title = if (incognito) "Инкогнито" else "Новая вкладка"))
         activeTabId = id
         screen = "home"
     }
+
     fun closeTab(id: Int) {
         if (tabs.size == 1) {
             tabs[0] = BrowserTab(1)
@@ -181,7 +192,7 @@ fun WebYouRoot() {
                 containerColor = MaterialTheme.colorScheme.background,
                 contentWindowInsets = WindowInsets.navigationBars,
                 topBar = {
-                    if (state.screen != "home") {
+                    if (state.screen != "home" && state.screen != "browser") {
                         TopAppBar(
                             title = { Text(screenTitle(state.screen), fontWeight = FontWeight.SemiBold) },
                             navigationIcon = { IconButton(onClick = { state.screen = "home" }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, null) } },
@@ -192,26 +203,27 @@ fun WebYouRoot() {
             ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
                     ExpressiveBackground(depth = state.waveDepth, count = state.waveCount, dark = MaterialTheme.colorScheme.background.luminance() < 0.5f)
-                    AnimatedContent(targetState = state.screen, label = "screen") { screen ->
-                        when (screen) {
-                            "home" -> HomeScreen(state)
-                            "browser" -> BrowserView(state)
-                            "tabs" -> TabsScreen(state)
-                            "settings" -> SettingsScreen(state)
-                            "privacy" -> PrivacyScreen(state)
-                            "translate" -> TranslateScreen(state)
-                            "proxy" -> ProxyScreen(state)
-                            else -> HomeScreen(state)
-                        }
+                    when (state.screen) {
+                        "home" -> HomeScreen(state)
+                        "browser" -> BrowserView(state)
+                        "tabs" -> TabsScreen(state)
+                        "settings" -> SettingsScreen(state)
+                        "privacy" -> PrivacyScreen(state)
+                        "translate" -> TranslateScreen(state)
+                        "proxy" -> ProxyScreen(state)
+                        else -> HomeScreen(state)
                     }
                 }
             }
+        }
+
+        if (state.menuOpen) {
+            BrowserBottomSheet(state, onDismiss = { state.menuOpen = false })
         }
     }
 }
 
 private fun screenTitle(screen: String) = when (screen) {
-    "browser" -> "WebYou"
     "tabs" -> "Вкладки"
     "settings" -> "Настройки"
     "privacy" -> "Приватность"
@@ -251,7 +263,10 @@ private fun ExpressiveBackground(modifier: Modifier = Modifier, depth: Float = 0
 @Composable
 private fun HomeScreen(s: WebYouState) {
     var query by remember { mutableStateOf("") }
-    Column(Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Spacer(Modifier.height(42.dp))
         WebYouMark()
         Spacer(Modifier.height(12.dp))
@@ -265,8 +280,9 @@ private fun HomeScreen(s: WebYouState) {
             singleLine = true,
             shape = RoundedCornerShape(32.dp),
             leadingIcon = { Icon(Icons.Rounded.Search, null) },
-            trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { openQuery(s, query) }) { Icon(Icons.Rounded.OpenInNew, contentDescription = "Открыть") } },
             placeholder = { Text("поиск или адрес") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { openQuery(s, query) }),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
@@ -275,25 +291,42 @@ private fun HomeScreen(s: WebYouState) {
                 disabledIndicatorColor = Color.Transparent
             )
         )
-        Spacer(Modifier.height(26.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            HomeShortcut("Google", Icons.Rounded.Search, Modifier.weight(1f)) { openQuery(s, "https://www.google.com") }
-            HomeShortcut("YouTube", Icons.Rounded.Language, Modifier.weight(1f)) { openQuery(s, "https://www.youtube.com") }
-            HomeShortcut("Wikipedia", Icons.Rounded.Language, Modifier.weight(1f)) { openQuery(s, "https://www.wikipedia.org") }
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            HomeShortcut("GitHub", Icons.Rounded.MoreVert, Modifier.weight(1f)) { openQuery(s, "https://github.com") }
-            HomeShortcut("Reddit", Icons.Rounded.Visibility, Modifier.weight(1f)) { openQuery(s, "https://www.reddit.com") }
-            HomeShortcut("DuckDuckGo", Icons.Rounded.Language, Modifier.weight(1f)) { openQuery(s, "https://duckduckgo.com") }
-        }
         Spacer(Modifier.weight(1f))
-        if (s.proxyEnabled) {
-            AssistChip(onClick = { s.screen = "proxy" }, label = { Text("Прокси включён") }, leadingIcon = { Icon(Icons.Rounded.Wifi, null) })
-            Spacer(Modifier.height(10.dp))
+        HomeBottomBar(s)
+    }
+}
+
+@Composable
+private fun HomeBottomBar(s: WebYouState) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+        tonalElevation = 2.dp
+    ) {
+        Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            BottomAction("Главная", Icons.Rounded.Home, true) { s.screen = "home" }
+            BottomAction("Вкладки", Icons.Rounded.Language) { s.screen = "tabs" }
+            BottomAction("Настройки", Icons.Rounded.Settings) { s.screen = "settings" }
+            BottomAction("Ещё", Icons.Rounded.MoreVert) { s.menuOpen = true }
         }
-        Text("${s.tabs.size} ${if (s.tabs.size == 1) "вкладка" else "вкладки"}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-        Spacer(Modifier.height(12.dp))
+    }
+    Spacer(Modifier.height(8.dp))
+}
+
+@Composable
+private fun BottomAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean = false, onClick: () -> Unit) {
+    Column(
+        Modifier.width(76.dp).clickable(onClick = onClick).padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+        ) {
+            Icon(icon, null, Modifier.padding(horizontal = 16.dp, vertical = 5.dp), tint = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -316,33 +349,178 @@ private fun WebYouMark() {
         drawPath(leaf, primaryContainer)
         drawOval(primary, topLeft = androidx.compose.ui.geometry.Offset(center.x - r * 0.72f, center.y - r * 0.34f), size = androidx.compose.ui.geometry.Size(r * 1.44f, r * 0.68f))
         drawOval(onPrimary, topLeft = androidx.compose.ui.geometry.Offset(center.x - r * 0.43f, center.y - r * 0.16f), size = androidx.compose.ui.geometry.Size(r * 0.86f, r * 0.32f))
-        val arrow = Path().apply {
-            moveTo(center.x - r * 0.20f, center.y + r * 0.10f)
-            cubicTo(center.x + r * 0.05f, center.y + r * 0.30f, center.x + r * 0.32f, center.y + r * 0.12f, center.x + r * 0.42f, center.y - r * 0.08f)
-            lineTo(center.x + r * 0.28f, center.y - r * 0.02f)
-            lineTo(center.x + r * 0.50f, center.y - r * 0.18f)
-            lineTo(center.x + r * 0.42f, center.y + r * 0.10f)
-            close()
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun BrowserBottomSheet(s: WebYouState, onDismiss: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("WebYou", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MenuTile("Назад", Icons.AutoMirrored.Rounded.ArrowBack, Modifier.weight(1f)) { s.menuOpen = false; s.screen = "browser" }
+                MenuTile("Обновить", Icons.Rounded.Refresh, Modifier.weight(1f)) { s.menuOpen = false }
+                MenuTile("Домой", Icons.Rounded.Home, Modifier.weight(1f)) { s.menuOpen = false; s.screen = "home" }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MenuTile("Новая", Icons.Rounded.Add, Modifier.weight(1f)) { s.addTab(); s.menuOpen = false }
+                MenuTile("Инкогнито", Icons.Rounded.VisibilityOff, Modifier.weight(1f)) { s.addTab(true); s.menuOpen = false }
+                MenuTile("Вкладки", Icons.Rounded.Language, Modifier.weight(1f)) { s.screen = "tabs"; s.menuOpen = false }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MenuTile("Настройки", Icons.Rounded.Settings, Modifier.weight(1f)) { s.screen = "settings"; s.menuOpen = false }
+                MenuTile("Приватность", Icons.Rounded.PrivacyTip, Modifier.weight(1f)) { s.screen = "privacy"; s.menuOpen = false }
+                MenuTile("Перевод", Icons.Rounded.Translate, Modifier.weight(1f)) { s.screen = "translate"; s.menuOpen = false }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MenuTile("Прокси", Icons.Rounded.Wifi, Modifier.weight(1f)) { s.screen = "proxy"; s.menuOpen = false }
+                Spacer(Modifier.weight(2f))
+            }
+            Spacer(Modifier.height(20.dp))
         }
-        drawPath(arrow, primary)
     }
 }
 
 @Composable
-private fun HomeShortcut(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: () -> Unit) {
-    Surface(modifier = modifier.height(78.dp).clickable(onClick = onClick), shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.90f), tonalElevation = 2.dp) {
+private fun MenuTile(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: () -> Unit) {
+    Surface(modifier = modifier.height(76.dp).clickable(onClick = onClick), shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(6.dp))
-            Text(label, fontWeight = FontWeight.Medium, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(5.dp))
+            Text(label, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
-private fun openQuery(s: WebYouState, query: String) {
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun BrowserView(s: WebYouState) {
     val tab = s.activeTab()
-    tab.url = if (query.startsWith("http://") || query.startsWith("https://")) query else "https://www.google.com/search?q=" + java.net.URLEncoder.encode(query, "UTF-8")
-    tab.title = query
+    var address by remember(tab.id) { mutableStateOf(tab.url) }
+    var webView by remember(tab.id) { mutableStateOf<WebView?>(null) }
+
+    LaunchedEffect(tab.url) {
+        if (address != tab.url) address = tab.url
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 1.dp) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    modifier = Modifier.weight(1f).height(58.dp),
+                    singleLine = true,
+                    shape = RoundedCornerShape(28.dp),
+                    leadingIcon = {
+                        Icon(if (address.startsWith("https://")) Icons.Rounded.Security else Icons.Rounded.Search, null)
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            val target = normalizeAddress(address)
+                            tab.url = target
+                            webView?.loadUrl(target)
+                        }) { Icon(Icons.Rounded.Search, "Перейти") }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                    keyboardActions = KeyboardActions(onGo = {
+                        val target = normalizeAddress(address)
+                        tab.url = target
+                        webView?.loadUrl(target)
+                    }),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    )
+                )
+            }
+        }
+
+        AndroidView(
+            modifier = Modifier.weight(1f),
+            factory = { context ->
+                WebView(context).apply {
+                    webView = this
+                    layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.loadsImagesAutomatically = true
+                    settings.cacheMode = WebSettings.LOAD_DEFAULT
+                    webViewClient = object : WebViewClient() {
+                        override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+                            if (s.adBlockEnabled && request?.url != null && isAdHost(request.url.host ?: "")) {
+                                s.blockedCount++
+                                return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
+                            }
+                            return super.shouldInterceptRequest(view, request)
+                        }
+
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            if (url != null) {
+                                tab.url = url
+                                address = url
+                            }
+                            tab.title = view?.title ?: tab.title
+                        }
+                    }
+                    loadUrl(tab.url)
+                }
+            },
+            update = { current ->
+                webView = current
+                if (current.url != tab.url && tab.url.isNotBlank()) current.loadUrl(tab.url)
+            }
+        )
+
+        BrowserBottomBar(
+            onHome = { s.screen = "home" },
+            onBack = { webView?.goBack() },
+            onForward = { webView?.goForward() },
+            onRefresh = { webView?.reload() },
+            onTabs = { s.screen = "tabs" },
+            onMore = { s.menuOpen = true }
+        )
+    }
+}
+
+@Composable
+private fun BrowserBottomBar(onHome: () -> Unit, onBack: () -> Unit, onForward: () -> Unit, onRefresh: () -> Unit, onTabs: () -> Unit, onMore: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f), tonalElevation = 3.dp) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 5.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            BottomIcon("Домой", Icons.Rounded.Home, onHome)
+            BottomIcon("Назад", Icons.AutoMirrored.Rounded.ArrowBack, onBack)
+            BottomIcon("Вперёд", Icons.AutoMirrored.Rounded.ArrowForward, onForward)
+            BottomIcon("Обновить", Icons.Rounded.Refresh, onRefresh)
+            BottomIcon("Вкладки", Icons.Rounded.Language, onTabs)
+            BottomIcon("Ещё", Icons.Rounded.MoreVert, onMore)
+        }
+    }
+}
+
+@Composable
+private fun BottomIcon(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    Column(Modifier.width(56.dp).clickable(onClick = onClick).padding(vertical = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(icon, null, Modifier.padding(5.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+private fun normalizeAddress(query: String): String {
+    val value = query.trim()
+    if (value.isBlank()) return HOME_URL
+    return if (value.startsWith("http://") || value.startsWith("https://")) value
+    else if (value.contains(".") && !value.contains(" ")) "https://$value"
+    else "https://www.google.com/search?q=${URLEncoder.encode(value, "UTF-8")}"
+}
+
+private fun openQuery(s: WebYouState, query: String) {
+    val target = normalizeAddress(query)
+    s.activeTab().url = target
+    s.activeTab().title = query.ifBlank { "Google" }
     s.screen = "browser"
 }
 
@@ -351,14 +529,14 @@ private fun TabsScreen(s: WebYouState) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { s.addTab() }, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Add, null); Spacer(Modifier.width(6.dp)); Text("Новая") }
-            Button(onClick = { s.addTab(true) }, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Security, null); Spacer(Modifier.width(6.dp)); Text("Инкогнито") }
+            Button(onClick = { s.addTab(true) }, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.VisibilityOff, null); Spacer(Modifier.width(6.dp)); Text("Инкогнито") }
         }
         Spacer(Modifier.height(12.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(s.tabs, key = { it.id }) { tab ->
-                Card(Modifier.fillMaxWidth().clickable { s.activeTabId = tab.id; s.screen = "home" }, shape = RoundedCornerShape(24.dp)) {
+                Card(Modifier.fillMaxWidth().clickable { s.activeTabId = tab.id; s.screen = "browser" }, shape = RoundedCornerShape(24.dp)) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (tab.incognito) Icons.Rounded.Visibility else Icons.Rounded.Language, null)
+                        Icon(if (tab.incognito) Icons.Rounded.VisibilityOff else Icons.Rounded.Language, null)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(tab.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -376,7 +554,9 @@ private fun TabsScreen(s: WebYouState) {
 private fun SettingsScreen(s: WebYouState) {
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SettingCard("Тема", Icons.Rounded.Palette) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) { AppTheme.entries.forEach { theme -> AssistChip(onClick = { s.theme = theme }, label = { Text(theme.name.lowercase()) }) } }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AppTheme.entries.forEach { theme -> AssistChip(onClick = { s.theme = theme }, label = { Text(theme.name.lowercase()) }) }
+            }
         } }
         item { SettingCard("Акцент", Icons.Rounded.Palette) { Slider(value = s.accent.toFloat(), onValueChange = { s.accent = it.roundToInt().coerceIn(0, 3) }, valueRange = 0f..3f, steps = 2) } }
         item { SettingCard("Выразительный фон", Icons.Rounded.Tune) {
@@ -402,7 +582,14 @@ private fun SettingCard(title: String, icon: androidx.compose.ui.graphics.vector
 
 @Composable
 private fun SettingToggle(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Card(shape = RoundedCornerShape(26.dp)) { Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null); Spacer(Modifier.width(10.dp)); Text(title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold); Switch(checked, onCheckedChange) } }
+    Card(shape = RoundedCornerShape(26.dp)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null)
+            Spacer(Modifier.width(10.dp))
+            Text(title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+            Switch(checked, onCheckedChange)
+        }
+    }
 }
 
 @Composable
@@ -422,7 +609,7 @@ private fun TranslateScreen(s: WebYouState) {
     var url by remember { mutableStateOf(s.activeTab().url) }
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(url, { url = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("URL") })
-        Button(onClick = { s.activeTab().url = TRANSLATE_BASE + java.net.URLEncoder.encode(url, "UTF-8"); s.screen = "home" }) { Icon(Icons.Rounded.Translate, null); Spacer(Modifier.width(8.dp)); Text("Открыть перевод") }
+        Button(onClick = { s.activeTab().url = TRANSLATE_BASE + URLEncoder.encode(url, "UTF-8"); s.screen = "browser" }) { Icon(Icons.Rounded.Translate, null); Spacer(Modifier.width(8.dp)); Text("Открыть перевод") }
     }
 }
 
@@ -432,7 +619,11 @@ private fun ProxyScreen(s: WebYouState) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SettingCard("Прокси", Icons.Rounded.Wifi) {
             OutlinedTextField(host, { host = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("host:port") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
-            SettingToggle("Включить", Icons.Rounded.Wifi, s.proxyEnabled) { enabled -> s.proxyEnabled = enabled; s.proxyHost = host; applyProxy(enabled, host) }
+            SettingToggle("Включить", Icons.Rounded.Wifi, s.proxyEnabled) { enabled ->
+                s.proxyEnabled = enabled
+                s.proxyHost = host
+                applyProxy(enabled, host)
+            }
         }
     }
 }
@@ -440,34 +631,12 @@ private fun ProxyScreen(s: WebYouState) {
 private fun applyProxy(enabled: Boolean, host: String) {
     if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) return
     val controller = ProxyController.getInstance()
-    if (!enabled || host.isBlank()) { controller.clearProxyOverride(Executors.newSingleThreadExecutor(), Runnable {}); return }
+    if (!enabled || host.isBlank()) {
+        controller.clearProxyOverride(Executors.newSingleThreadExecutor(), Runnable {})
+        return
+    }
     val config = ProxyConfig.Builder().addProxyRule("http://$host").addProxyRule("https://$host").build()
     controller.setProxyOverride(config, Executors.newSingleThreadExecutor(), Runnable {})
-}
-
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-private fun BrowserView(s: WebYouState) {
-    val tab = s.activeTab()
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { context -> WebView(context).apply {
-            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.loadsImagesAutomatically = true
-            settings.cacheMode = WebSettings.LOAD_DEFAULT
-            webViewClient = object : WebViewClient() {
-                override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-                    if (s.adBlockEnabled && request?.url != null && isAdHost(request.url.host ?: "")) { s.blockedCount++; return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0))) }
-                    return super.shouldInterceptRequest(view, request)
-                }
-                override fun onPageFinished(view: WebView?, url: String?) { if (url != null) tab.url = url; tab.title = view?.title ?: tab.title }
-            }
-            loadUrl(tab.url)
-        } },
-        update = { webView -> if (webView.url != tab.url) webView.loadUrl(tab.url) }
-    )
 }
 
 private fun isAdHost(host: String): Boolean {
