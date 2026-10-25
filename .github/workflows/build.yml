@@ -15,6 +15,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Verify checked out commit
+        run: git rev-parse HEAD
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
