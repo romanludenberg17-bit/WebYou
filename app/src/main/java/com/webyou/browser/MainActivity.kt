@@ -82,7 +82,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.luminance
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -163,7 +163,6 @@ fun WebYouRoot() {
     val lightPrimary = listOf(Color(0xFF7656D6), Color(0xFF3F63D8), Color(0xFFAF4D7B), Color(0xFF4B8C7A))
     val darkPrimary = listOf(Color(0xFFB8A6FF), Color(0xFFA9B9FF), Color(0xFFFFA8D2), Color(0xFF9FE0CA))
     val primary = if (isDark) darkPrimary[state.accent] else lightPrimary[state.accent]
-
     val baseScheme = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && isDark -> dynamicDarkColorScheme(context)
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> dynamicLightColorScheme(context)
@@ -222,18 +221,13 @@ private fun screenTitle(screen: String) = when (screen) {
 }
 
 @Composable
-private fun ExpressiveBackground(
-    modifier: Modifier = Modifier,
-    depth: Float = 0.08f,
-    count: Int = 8,
-    dark: Boolean
-) {
+private fun ExpressiveBackground(modifier: Modifier = Modifier, depth: Float = 0.08f, count: Int = 8, dark: Boolean) {
     Canvas(modifier.fillMaxSize()) {
         drawRect(if (dark) Color(0xFF0F0F12) else Color(0xFFFAF8FF))
         val blob = if (dark) Color(0xFF3A2D52) else Color(0xFFE7DFFF)
         val width = size.width
         val height = size.height
-        val path = Path().apply {
+        val upper = Path().apply {
             moveTo(-width * 0.12f, height * 0.20f)
             cubicTo(width * 0.16f, height * 0.05f, width * 0.42f, height * 0.32f, width * 0.72f, height * 0.16f)
             cubicTo(width * 0.88f, height * 0.08f, width * 1.06f, height * 0.12f, width * 1.10f, height * 0.24f)
@@ -241,8 +235,7 @@ private fun ExpressiveBackground(
             cubicTo(width * 0.78f, height * 0.36f, width * 0.42f, height * 0.48f, -width * 0.12f, height * 0.34f)
             close()
         }
-        drawPath(path, blob.copy(alpha = if (dark) 0.18f else 0.34f))
-
+        drawPath(upper, blob.copy(alpha = if (dark) 0.18f else 0.34f))
         val lower = Path().apply {
             moveTo(-width * 0.10f, height * 0.78f)
             cubicTo(width * 0.18f, height * 0.64f, width * 0.52f, height * 0.88f, width * 0.84f, height * 0.72f)
@@ -258,17 +251,13 @@ private fun ExpressiveBackground(
 @Composable
 private fun HomeScreen(s: WebYouState) {
     var query by remember { mutableStateOf("") }
-    Column(
-        Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Column(Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(42.dp))
         WebYouMark()
         Spacer(Modifier.height(12.dp))
         Text("WebYou", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         Text("твой браузер, по-твоему", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(28.dp))
-
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -276,13 +265,7 @@ private fun HomeScreen(s: WebYouState) {
             singleLine = true,
             shape = RoundedCornerShape(32.dp),
             leadingIcon = { Icon(Icons.Rounded.Search, null) },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = { openQuery(s, query) }) {
-                        Icon(Icons.Rounded.OpenInNew, contentDescription = "Открыть")
-                    }
-                }
-            },
+            trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { openQuery(s, query) }) { Icon(Icons.Rounded.OpenInNew, contentDescription = "Открыть") } },
             placeholder = { Text("поиск или адрес") },
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
@@ -292,7 +275,6 @@ private fun HomeScreen(s: WebYouState) {
                 disabledIndicatorColor = Color.Transparent
             )
         )
-
         Spacer(Modifier.height(26.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             HomeShortcut("Google", Icons.Rounded.Search, Modifier.weight(1f)) { openQuery(s, "https://www.google.com") }
@@ -301,9 +283,9 @@ private fun HomeScreen(s: WebYouState) {
         }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            HomeShortcut("GitHub", Icons.Rounded.Code, Modifier.weight(1f)) { openQuery(s, "https://github.com") }
-            HomeShortcut("Reddit", Icons.Rounded.Forum, Modifier.weight(1f)) { openQuery(s, "https://www.reddit.com") }
-            HomeShortcut("DuckDuckGo", Icons.Rounded.Public, Modifier.weight(1f)) { openQuery(s, "https://duckduckgo.com") }
+            HomeShortcut("GitHub", Icons.Rounded.MoreVert, Modifier.weight(1f)) { openQuery(s, "https://github.com") }
+            HomeShortcut("Reddit", Icons.Rounded.Visibility, Modifier.weight(1f)) { openQuery(s, "https://www.reddit.com") }
+            HomeShortcut("DuckDuckGo", Icons.Rounded.Language, Modifier.weight(1f)) { openQuery(s, "https://duckduckgo.com") }
         }
         Spacer(Modifier.weight(1f))
         if (s.proxyEnabled) {
@@ -317,6 +299,9 @@ private fun HomeScreen(s: WebYouState) {
 
 @Composable
 private fun WebYouMark() {
+    val primary = MaterialTheme.colorScheme.primary
+    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
     Canvas(Modifier.width(64.dp).height(64.dp)) {
         val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
         val r = size.minDimension * 0.39f
@@ -328,9 +313,9 @@ private fun WebYouMark() {
             cubicTo(center.x - r * 1.02f, center.y - r * 0.62f, center.x - r * 0.62f, center.y - r * 1.05f, center.x, center.y - r)
             close()
         }
-        drawPath(leaf, MaterialTheme.colorScheme.primaryContainer)
-        drawOval(MaterialTheme.colorScheme.primary, topLeft = androidx.compose.ui.geometry.Offset(center.x - r * 0.72f, center.y - r * 0.34f), size = androidx.compose.ui.geometry.Size(r * 1.44f, r * 0.68f))
-        drawOval(MaterialTheme.colorScheme.onPrimary, topLeft = androidx.compose.ui.geometry.Offset(center.x - r * 0.43f, center.y - r * 0.16f), size = androidx.compose.ui.geometry.Size(r * 0.86f, r * 0.32f))
+        drawPath(leaf, primaryContainer)
+        drawOval(primary, topLeft = androidx.compose.ui.geometry.Offset(center.x - r * 0.72f, center.y - r * 0.34f), size = androidx.compose.ui.geometry.Size(r * 1.44f, r * 0.68f))
+        drawOval(onPrimary, topLeft = androidx.compose.ui.geometry.Offset(center.x - r * 0.43f, center.y - r * 0.16f), size = androidx.compose.ui.geometry.Size(r * 0.86f, r * 0.32f))
         val arrow = Path().apply {
             moveTo(center.x - r * 0.20f, center.y + r * 0.10f)
             cubicTo(center.x + r * 0.05f, center.y + r * 0.30f, center.x + r * 0.32f, center.y + r * 0.12f, center.x + r * 0.42f, center.y - r * 0.08f)
@@ -339,18 +324,13 @@ private fun WebYouMark() {
             lineTo(center.x + r * 0.42f, center.y + r * 0.10f)
             close()
         }
-        drawPath(arrow, MaterialTheme.colorScheme.primary)
+        drawPath(arrow, primary)
     }
 }
 
 @Composable
 private fun HomeShortcut(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: () -> Unit) {
-    Surface(
-        modifier = modifier.height(78.dp).clickable(onClick = onClick),
-        shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.90f),
-        tonalElevation = 2.dp
-    ) {
+    Surface(modifier = modifier.height(78.dp).clickable(onClick = onClick), shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.90f), tonalElevation = 2.dp) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(6.dp))
@@ -396,13 +376,9 @@ private fun TabsScreen(s: WebYouState) {
 private fun SettingsScreen(s: WebYouState) {
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SettingCard("Тема", Icons.Rounded.Palette) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AppTheme.entries.forEach { theme -> AssistChip(onClick = { s.theme = theme }, label = { Text(theme.name.lowercase()) }) }
-            }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) { AppTheme.entries.forEach { theme -> AssistChip(onClick = { s.theme = theme }, label = { Text(theme.name.lowercase()) }) } }
         } }
-        item { SettingCard("Акцент", Icons.Rounded.Palette) {
-            Slider(value = s.accent.toFloat(), onValueChange = { s.accent = it.roundToInt().coerceIn(0, 3) }, valueRange = 0f..3f, steps = 2)
-        } }
+        item { SettingCard("Акцент", Icons.Rounded.Palette) { Slider(value = s.accent.toFloat(), onValueChange = { s.accent = it.roundToInt().coerceIn(0, 3) }, valueRange = 0f..3f, steps = 2) } }
         item { SettingCard("Выразительный фон", Icons.Rounded.Tune) {
             Text("глубина")
             Slider(value = s.waveDepth, onValueChange = { s.waveDepth = it }, valueRange = 0.02f..0.18f)
@@ -426,11 +402,7 @@ private fun SettingCard(title: String, icon: androidx.compose.ui.graphics.vector
 
 @Composable
 private fun SettingToggle(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Card(shape = RoundedCornerShape(26.dp)) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null); Spacer(Modifier.width(10.dp)); Text(title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold); Switch(checked, onCheckedChange)
-        }
-    }
+    Card(shape = RoundedCornerShape(26.dp)) { Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null); Spacer(Modifier.width(10.dp)); Text(title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold); Switch(checked, onCheckedChange) } }
 }
 
 @Composable
@@ -460,11 +432,7 @@ private fun ProxyScreen(s: WebYouState) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SettingCard("Прокси", Icons.Rounded.Wifi) {
             OutlinedTextField(host, { host = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("host:port") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
-            SettingToggle("Включить", Icons.Rounded.Wifi, s.proxyEnabled) { enabled ->
-                s.proxyEnabled = enabled
-                s.proxyHost = host
-                applyProxy(enabled, host)
-            }
+            SettingToggle("Включить", Icons.Rounded.Wifi, s.proxyEnabled) { enabled -> s.proxyEnabled = enabled; s.proxyHost = host; applyProxy(enabled, host) }
         }
     }
 }
@@ -472,10 +440,7 @@ private fun ProxyScreen(s: WebYouState) {
 private fun applyProxy(enabled: Boolean, host: String) {
     if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) return
     val controller = ProxyController.getInstance()
-    if (!enabled || host.isBlank()) {
-        controller.clearProxyOverride(Executors.newSingleThreadExecutor(), Runnable {})
-        return
-    }
+    if (!enabled || host.isBlank()) { controller.clearProxyOverride(Executors.newSingleThreadExecutor(), Runnable {}); return }
     val config = ProxyConfig.Builder().addProxyRule("http://$host").addProxyRule("https://$host").build()
     controller.setProxyOverride(config, Executors.newSingleThreadExecutor(), Runnable {})
 }
@@ -486,29 +451,21 @@ private fun BrowserView(s: WebYouState) {
     val tab = s.activeTab()
     AndroidView(
         modifier = Modifier.fillMaxSize(),
-        factory = { context ->
-            WebView(context).apply {
-                layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                settings.loadsImagesAutomatically = true
-                settings.cacheMode = WebSettings.LOAD_DEFAULT
-                webViewClient = object : WebViewClient() {
-                    override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-                        if (s.adBlockEnabled && request?.url != null && isAdHost(request.url.host ?: "")) {
-                            s.blockedCount++
-                            return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
-                        }
-                        return super.shouldInterceptRequest(view, request)
-                    }
-                    override fun onPageFinished(view: WebView?, url: String?) {
-                        if (url != null) tab.url = url
-                        tab.title = view?.title ?: tab.title
-                    }
+        factory = { context -> WebView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.loadsImagesAutomatically = true
+            settings.cacheMode = WebSettings.LOAD_DEFAULT
+            webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+                    if (s.adBlockEnabled && request?.url != null && isAdHost(request.url.host ?: "")) { s.blockedCount++; return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0))) }
+                    return super.shouldInterceptRequest(view, request)
                 }
-                loadUrl(tab.url)
+                override fun onPageFinished(view: WebView?, url: String?) { if (url != null) tab.url = url; tab.title = view?.title ?: tab.title }
             }
-        },
+            loadUrl(tab.url)
+        } },
         update = { webView -> if (webView.url != tab.url) webView.loadUrl(tab.url) }
     )
 }
