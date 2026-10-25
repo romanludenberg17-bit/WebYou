@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.webyou.browser"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.webyou.browser"
