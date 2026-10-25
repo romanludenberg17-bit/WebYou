@@ -82,7 +82,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -206,7 +206,7 @@ fun WebYouRoot() {
                         }
                     }
                 }
-            )
+            }
         }
     }
 }
@@ -320,7 +320,7 @@ private fun WebYouMark() {
     Canvas(Modifier.width(64.dp).height(64.dp)) {
         val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
         val r = size.minDimension * 0.39f
-        val leaf = androidx.compose.ui.geometry.Path().apply {
+        val leaf = Path().apply {
             moveTo(center.x, center.y - r)
             cubicTo(center.x + r * 0.62f, center.y - r * 1.05f, center.x + r * 1.02f, center.y - r * 0.62f, center.x + r * 0.78f, center.y)
             cubicTo(center.x + r * 1.02f, center.y + r * 0.62f, center.x + r * 0.62f, center.y + r * 1.05f, center.x, center.y + r)
@@ -329,8 +329,8 @@ private fun WebYouMark() {
             close()
         }
         drawPath(leaf, MaterialTheme.colorScheme.primaryContainer)
-        drawOval(MaterialTheme.colorScheme.primary, androidx.compose.ui.geometry.Rect(center.x - r * 0.72f, center.y - r * 0.34f, center.x + r * 0.72f, center.y + r * 0.34f))
-        drawOval(MaterialTheme.colorScheme.onPrimary, androidx.compose.ui.geometry.Rect(center.x - r * 0.43f, center.y - r * 0.16f, center.x + r * 0.43f, center.y + r * 0.16f))
+        drawOval(MaterialTheme.colorScheme.primary, topLeft = androidx.compose.ui.geometry.Offset(center.x - r * 0.72f, center.y - r * 0.34f), size = androidx.compose.ui.geometry.Size(r * 1.44f, r * 0.68f))
+        drawOval(MaterialTheme.colorScheme.onPrimary, topLeft = androidx.compose.ui.geometry.Offset(center.x - r * 0.43f, center.y - r * 0.16f), size = androidx.compose.ui.geometry.Size(r * 0.86f, r * 0.32f))
         val arrow = Path().apply {
             moveTo(center.x - r * 0.20f, center.y + r * 0.10f)
             cubicTo(center.x + r * 0.05f, center.y + r * 0.30f, center.x + r * 0.32f, center.y + r * 0.12f, center.x + r * 0.42f, center.y - r * 0.08f)
@@ -397,9 +397,7 @@ private fun SettingsScreen(s: WebYouState) {
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SettingCard("Тема", Icons.Rounded.Palette) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AppTheme.entries.forEach { theme ->
-                    AssistChip(onClick = { s.theme = theme }, label = { Text(theme.name.lowercase()) })
-                }
+                AppTheme.entries.forEach { theme -> AssistChip(onClick = { s.theme = theme }, label = { Text(theme.name.lowercase()) }) }
             }
         } }
         item { SettingCard("Акцент", Icons.Rounded.Palette) {
