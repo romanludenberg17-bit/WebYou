@@ -173,6 +173,7 @@ class WebYouState {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun WebYouRoot() {
     val state = remember { WebYouState() }
@@ -217,7 +218,7 @@ fun WebYouRoot() {
                         }
                     }
                 }
-            }
+            )
         }
     }
 }
