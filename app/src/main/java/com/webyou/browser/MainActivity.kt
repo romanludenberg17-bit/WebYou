@@ -10,6 +10,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -141,6 +142,7 @@ class WebYouState {
     var waveDepth by mutableStateOf(0.08f)
     var waveCount by mutableIntStateOf(8)
     var menuOpen by mutableStateOf(false)
+    var exitPromptUntil by mutableStateOf(0L)
 
     fun activeTab(): BrowserTab = tabs.first { it.id == activeTabId }
 
@@ -223,6 +225,10 @@ fun WebYouRoot() {
             BrowserBottomSheet(state, onDismiss = { state.menuOpen = false })
         }
     }
+
+    BackHandler(enabled = state.menuOpen) {
+        state.menuOpen = false
+    }
 }
 
 private fun screenTitle(screen: String) = when (screen) {
@@ -298,62 +304,6 @@ private fun HomeScreen(s: WebYouState) {
     }
 }
 
-@Composable
-private fun HomeBottomBar(s: WebYouState) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-        tonalElevation = 2.dp
-    ) {
-        Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            BottomAction("Главная", Icons.Rounded.Home, true) { s.screen = "home" }
-            BottomAction("Вкладки", Icons.Rounded.Language) { s.screen = "tabs" }
-            BottomAction("Настройки", Icons.Rounded.Settings) { s.screen = "settings" }
-            BottomAction("Ещё", Icons.Rounded.MoreVert) { s.menuOpen = true }
-        }
-    }
-    Spacer(Modifier.height(8.dp))
-}
-
-@Composable
-private fun BottomAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean = false, onClick: () -> Unit) {
-    Column(
-        Modifier.width(76.dp).clickable(onClick = onClick).padding(vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Surface(
-            shape = RoundedCornerShape(18.dp),
-            color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
-        ) {
-            Icon(icon, null, Modifier.padding(horizontal = 16.dp, vertical = 5.dp), tint = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun WebYouMark() {
-    val primary = MaterialTheme.colorScheme.primary
-    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
-    val onPrimary = MaterialTheme.colorScheme.onPrimary
-    Canvas(Modifier.width(64.dp).height(64.dp)) {
-        val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
-        val r = size.minDimension * 0.39f
-        val leaf = Path().apply {
-            moveTo(center.x, center.y - r)
-            cubicTo(center.x + r * 0.62f, center.y - r * 1.05f, center.x + r * 1.02f, center.y - r * 0.62f, center.x + r * 0.78f, center.y)
-            cubicTo(center.x + r * 1.02f, center.y + r * 0.62f, center.x + r * 0.62f, center.y + r * 1.05f, center.x, center.y + r)
-            cubicTo(center.x - r * 0.62f, center.y + r * 1.05f, center.x - r * 1.02f, center.y + r * 0.62f, center.x - r * 0.78f, center.y)
-            cubicTo(center.x - r * 1.02f, center.y - r * 0.62f, center.x - r * 0.62f, center.y - r * 1.05f, center.x, center.y - r)
-            close()
-        }
-        drawPath(leaf, primaryContainer)
-        drawOval(primary, topLeft = androidx.compose.ui.geometry.Offset(center.x - r * 0.72f, center.y - r * 0.34f), size = androidx.compose.ui.geometry.Size(r * 1.44f, r * 0.68f))
-        drawOval(onPrimary, topLeft = androidx.compose.ui.geometry.Offset(center.x - r * 0.43f, center.y - r * 0.16f), size = androidx.compose.ui.geometry.Size(r * 0.86f, r * 0.32f))
-    }
-}
-
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun BrowserBottomSheet(s: WebYouState, onDismiss: () -> Unit) {
@@ -402,10 +352,23 @@ private fun BrowserView(s: WebYouState) {
     val tab = s.activeTab()
     var address by remember(tab.id) { mutableStateOf(tab.url) }
     var webView by remember(tab.id) { mutableStateOf<WebView?>(null) }
+    val context = LocalContext.current
 
     BackHandler {
         val current = webView
-        if (current?.canGoBack() == true) current.goBack() else s.screen = "home"
+        when {
+            current?.canGoBack() == true -> current.goBack()
+            s.screen == "browser" -> s.screen = "home"
+            else -> {
+                val now = System.currentTimeMillis()
+                if (now <= s.exitPromptUntil) {
+                    (context as? ComponentActivity)?.finish()
+                } else {
+                    s.exitPromptUntil = now + 2_000L
+                    Toast.makeText(context, "Нажмите ещё раз для выхода", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     LaunchedEffect(tab.url) {
@@ -543,98 +506,138 @@ private fun TabsScreen(s: WebYouState) {
 
 @Composable
 private fun SettingsScreen(s: WebYouState) {
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { SettingCard("Тема", Icons.Rounded.Palette) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AppTheme.entries.forEach { theme -> AssistChip(onClick = { s.theme = theme }, label = { Text(theme.name.lowercase()) }) }
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SettingsSection("Внешний вид") {
+            SettingRow("Тема", Icons.Rounded.Palette) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AppTheme.entries.forEach { theme ->
+                        AssistChip(onClick = { s.theme = theme }, label = { Text(theme.name.lowercase()) })
+                    }
+                }
             }
-        } }
-        item { SettingCard("Акцент", Icons.Rounded.Palette) { Slider(value = s.accent.toFloat(), onValueChange = { s.accent = it.roundToInt().coerceIn(0, 3) }, valueRange = 0f..3f, steps = 2) } }
-        item { SettingCard("Выразительный фон", Icons.Rounded.Tune) {
-            Text("глубина")
-            Slider(value = s.waveDepth, onValueChange = { s.waveDepth = it }, valueRange = 0.02f..0.18f)
-            Text("слоёв: ${s.waveCount}")
-            Slider(value = s.waveCount.toFloat(), onValueChange = { s.waveCount = it.roundToInt().coerceIn(3, 12) }, valueRange = 3f..12f, steps = 8)
-        } }
-        item { SettingToggle("Блокировка рекламы", Icons.Rounded.Security, s.adBlockEnabled) { s.adBlockEnabled = it } }
-        item { SettingCard("Прокси", Icons.Rounded.Wifi) { Button(onClick = { s.screen = "proxy" }) { Text(if (s.proxyEnabled) "настроить" else "включить") } } }
+            SettingRow("Акцент", Icons.Rounded.Tune) {
+                Slider(value = s.accent.toFloat(), onValueChange = { s.accent = it.toInt().coerceIn(0, 3) }, valueRange = 0f..3f, steps = 2)
+            }
+        }
+        SettingsSection("Приватность") {
+            SettingToggle("Блокировка рекламы", Icons.Rounded.Security, s.adBlockEnabled) { s.adBlockEnabled = it }
+        }
+        SettingsSection("Прокси") {
+            OutlinedTextField(value = s.proxyHost, onValueChange = { s.proxyHost = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("host:port") })
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("Включить прокси")
+                Switch(checked = s.proxyEnabled, onCheckedChange = { enabled -> s.proxyEnabled = enabled; applyProxy(s, enabled) })
+            }
+        }
+        Text("WebYou • Material 3 • Android 17", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     }
 }
 
 @Composable
-private fun SettingCard(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, content: @Composable ColumnScope.() -> Unit) {
-    Card(shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) { Icon(icon, null); Spacer(Modifier.width(10.dp)); Text(title, fontWeight = FontWeight.SemiBold) }
+private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             content()
         }
     }
 }
 
 @Composable
-private fun SettingToggle(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Card(shape = RoundedCornerShape(26.dp)) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null)
+private fun SettingRow(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(10.dp))
-            Text(title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-            Switch(checked, onCheckedChange)
+            Text(label, fontWeight = FontWeight.Medium)
         }
+        Spacer(Modifier.height(6.dp))
+        content()
+    }
+}
+
+@Composable
+private fun SettingToggle(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(10.dp))
+            Text(label)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
 @Composable
 private fun PrivacyScreen(s: WebYouState) {
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        SettingCard("Приватность", Icons.Rounded.PrivacyTip) {
-            Text("WebYou не требует учётной записи. Инкогнито-вкладки не сохраняют историю внутри состояния браузера.")
-            Divider()
-            Text("Заблокировано запросов: ${s.blockedCount}")
-            Button(onClick = { s.blockedCount = 0 }) { Text("Сбросить счётчик") }
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Блокировка рекламы", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Заблокировано: ${s.blockedCount}")
+                Divider()
+                Text("WebYou не отправляет историю просмотров на сервер.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
 
 @Composable
 private fun TranslateScreen(s: WebYouState) {
-    var url by remember { mutableStateOf(s.activeTab().url) }
+    var url by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(url, { url = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("URL") })
-        Button(onClick = { s.activeTab().url = TRANSLATE_BASE + URLEncoder.encode(url, "UTF-8"); s.screen = "browser" }) { Icon(Icons.Rounded.Translate, null); Spacer(Modifier.width(8.dp)); Text("Открыть перевод") }
+        OutlinedTextField(value = url, onValueChange = { url = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("URL страницы") })
+        Button(onClick = {
+            val target = TRANSLATE_BASE + URLEncoder.encode(url.trim(), "UTF-8")
+            s.activeTab().url = target
+            s.screen = "browser"
+        }, modifier = Modifier.fillMaxWidth()) { Text("Перевести") }
     }
 }
 
 @Composable
 private fun ProxyScreen(s: WebYouState) {
-    var host by remember { mutableStateOf(s.proxyHost) }
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SettingCard("Прокси", Icons.Rounded.Wifi) {
-            OutlinedTextField(host, { host = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("host:port") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
-            SettingToggle("Включить", Icons.Rounded.Wifi, s.proxyEnabled) { enabled ->
-                s.proxyEnabled = enabled
-                s.proxyHost = host
-                applyProxy(enabled, host)
-            }
+        OutlinedTextField(value = s.proxyHost, onValueChange = { s.proxyHost = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Прокси host:port") })
+        Button(onClick = { s.proxyEnabled = !s.proxyEnabled; applyProxy(s, s.proxyEnabled) }, modifier = Modifier.fillMaxWidth()) { Text(if (s.proxyEnabled) "Отключить" else "Включить") }
+    }
+}
+
+private fun applyProxy(s: WebYouState, enabled: Boolean) {
+    if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) return
+    val controller = ProxyController.getInstance()
+    val executor = Executors.newSingleThreadExecutor()
+    executor.execute {
+        val config = if (enabled && s.proxyHost.isNotBlank()) {
+            ProxyConfig.Builder().addProxyRule("http://${s.proxyHost.trim()}").build()
+        } else {
+            ProxyConfig.Builder().addDirect().build()
+        }
+        controller.setProxyOverride(config, executor) {}
+    }
+}
+
+@Composable
+private fun HomeBottomBar(s: WebYouState) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f), tonalElevation = 3.dp) {
+        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            BottomIcon("Вкладки", Icons.Rounded.Language, { s.screen = "tabs" })
+            BottomIcon("Настройки", Icons.Rounded.Settings, { s.screen = "settings" })
+            BottomIcon("Ещё", Icons.Rounded.MoreVert, { s.menuOpen = true })
         }
     }
 }
 
-private fun applyProxy(enabled: Boolean, host: String) {
-    if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) return
-    val controller = ProxyController.getInstance()
-    if (!enabled || host.isBlank()) {
-        controller.clearProxyOverride(Executors.newSingleThreadExecutor(), Runnable {})
-        return
+@Composable
+private fun WebYouMark() {
+    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.width(58.dp).height(58.dp)) {
+        Box(contentAlignment = Alignment.Center) {
+            Text("W", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
     }
-    val config = ProxyConfig.Builder().addProxyRule("http://$host").addProxyRule("https://$host").build()
-    controller.setProxyOverride(config, Executors.newSingleThreadExecutor(), Runnable {})
 }
 
 private fun isAdHost(host: String): Boolean {
-    val lower = host.lowercase()
-    val hosts = listOf("doubleclick.net", "googlesyndication.com", "googleadservices.com", "adservice.google.com", "adnxs.com", "taboola.com", "outbrain.com", "criteo.com", "rubiconproject.com", "pubmatic.com", "scorecardresearch.com")
-    return hosts.any { lower == it || lower.endsWith(".$it") }
+    val h = host.lowercase()
+    return h.contains("doubleclick") || h.contains("googlesyndication") || h.contains("adservice") || h.contains("adsystem") || h.contains("adnxs")
 }
-
-private fun Int.roundToInt(): Int = kotlin.math.round(this.toFloat()).toInt()
-private fun Float.roundToInt(): Int = kotlin.math.round(this).toInt()
