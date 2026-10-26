@@ -229,6 +229,16 @@ fun WebYouRoot() {
     BackHandler(enabled = state.menuOpen) {
         state.menuOpen = false
     }
+
+    BackHandler(enabled = !state.menuOpen && state.screen == "home") {
+        val now = System.currentTimeMillis()
+        if (now <= state.exitPromptUntil) {
+            (context as? ComponentActivity)?.finish()
+        } else {
+            state.exitPromptUntil = now + 2_000L
+            Toast.makeText(context, "Нажмите ещё раз для выхода", Toast.LENGTH_SHORT).show()
+        }
+    }
 }
 
 private fun screenTitle(screen: String) = when (screen) {
@@ -352,22 +362,13 @@ private fun BrowserView(s: WebYouState) {
     val tab = s.activeTab()
     var address by remember(tab.id) { mutableStateOf(tab.url) }
     var webView by remember(tab.id) { mutableStateOf<WebView?>(null) }
-    val context = LocalContext.current
 
     BackHandler {
         val current = webView
-        when {
-            current?.canGoBack() == true -> current.goBack()
-            s.screen == "browser" -> s.screen = "home"
-            else -> {
-                val now = System.currentTimeMillis()
-                if (now <= s.exitPromptUntil) {
-                    (context as? ComponentActivity)?.finish()
-                } else {
-                    s.exitPromptUntil = now + 2_000L
-                    Toast.makeText(context, "Нажмите ещё раз для выхода", Toast.LENGTH_SHORT).show()
-                }
-            }
+        if (current?.canGoBack() == true) {
+            current.goBack()
+        } else {
+            s.screen = "home"
         }
     }
 
