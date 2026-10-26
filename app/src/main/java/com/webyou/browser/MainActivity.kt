@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
-import android.view.inputmethod.EditorInfo
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -27,8 +26,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -300,7 +301,7 @@ private fun HomeScreen(s: WebYouState) {
 @Composable
 private fun HomeBottomBar(s: WebYouState) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
         tonalElevation = 2.dp
@@ -413,7 +414,7 @@ private fun BrowserView(s: WebYouState) {
 
     Column(Modifier.fillMaxSize()) {
         Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 1.dp) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = address,
                     onValueChange = { address = it },
@@ -480,7 +481,7 @@ private fun BrowserView(s: WebYouState) {
 @Composable
 private fun BrowserBottomBar(onHome: () -> Unit, onBack: () -> Unit, onForward: () -> Unit, onRefresh: () -> Unit, onTabs: () -> Unit, onMore: () -> Unit) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f), tonalElevation = 3.dp) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 5.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 6.dp, vertical = 5.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
             BottomIcon("Домой", Icons.Rounded.Home, onHome)
             BottomIcon("Назад", Icons.AutoMirrored.Rounded.ArrowBack, onBack)
             BottomIcon("Вперёд", Icons.AutoMirrored.Rounded.ArrowForward, onForward)
