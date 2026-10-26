@@ -215,7 +215,7 @@ fun WebYouRoot() {
                         else -> HomeScreen(state)
                     }
                 }
-            )
+            }
         }
 
         if (state.menuOpen) {
@@ -404,11 +404,7 @@ private fun BrowserView(s: WebYouState) {
 
     BackHandler {
         val current = webView
-        if (current?.canGoBack() == true) {
-            current.goBack()
-        } else {
-            s.screen = "home"
-        }
+        if (current?.canGoBack() == true) current.goBack() else s.screen = "home"
     }
 
     LaunchedEffect(tab.url) {
@@ -424,22 +420,10 @@ private fun BrowserView(s: WebYouState) {
                     modifier = Modifier.weight(1f).height(58.dp),
                     singleLine = true,
                     shape = RoundedCornerShape(28.dp),
-                    leadingIcon = {
-                        Icon(if (address.startsWith("https://")) Icons.Rounded.Security else Icons.Rounded.Search, null)
-                    },
-                    trailingIcon = {
-                        IconButton(onClick = {
-                            val target = normalizeAddress(address)
-                            tab.url = target
-                            webView?.loadUrl(target)
-                        }) { Icon(Icons.Rounded.Search, "Перейти") }
-                    },
+                    leadingIcon = { Icon(if (address.startsWith("https://")) Icons.Rounded.Security else Icons.Rounded.Search, null) },
+                    trailingIcon = { IconButton(onClick = { val target = normalizeAddress(address); tab.url = target; webView?.loadUrl(target) }) { Icon(Icons.Rounded.Search, "Перейти") } },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(onGo = {
-                        val target = normalizeAddress(address)
-                        tab.url = target
-                        webView?.loadUrl(target)
-                    }),
+                    keyboardActions = KeyboardActions(onGo = { val target = normalizeAddress(address); tab.url = target; webView?.loadUrl(target) }),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -468,12 +452,8 @@ private fun BrowserView(s: WebYouState) {
                             }
                             return super.shouldInterceptRequest(view, request)
                         }
-
                         override fun onPageFinished(view: WebView?, url: String?) {
-                            if (url != null) {
-                                tab.url = url
-                                address = url
-                            }
+                            if (url != null) { tab.url = url; address = url }
                             tab.title = view?.title ?: tab.title
                         }
                     }
