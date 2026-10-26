@@ -12,6 +12,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -214,7 +215,7 @@ fun WebYouRoot() {
                         else -> HomeScreen(state)
                     }
                 }
-            }
+            )
         }
 
         if (state.menuOpen) {
@@ -400,6 +401,15 @@ private fun BrowserView(s: WebYouState) {
     val tab = s.activeTab()
     var address by remember(tab.id) { mutableStateOf(tab.url) }
     var webView by remember(tab.id) { mutableStateOf<WebView?>(null) }
+
+    BackHandler {
+        val current = webView
+        if (current?.canGoBack() == true) {
+            current.goBack()
+        } else {
+            s.screen = "home"
+        }
+    }
 
     LaunchedEffect(tab.url) {
         if (address != tab.url) address = tab.url
